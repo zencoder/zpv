@@ -1,5 +1,3 @@
-LIBS := -lstdc++ -lavcodec -lavutil -lswscale
-
 OS := $(shell uname)
 ifeq ($(OS),Linux)
 EV_BACKEND += -DEV_USE_EPOLL

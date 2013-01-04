@@ -52,7 +52,7 @@ static void print_timer()
     ev_tstamp now = ev_now( loop );
     ev_tstamp total_time = now - start_time;
     if ( 0 == total_time ) return;
-    fprintf(stderr, "{ stdin_wait_ms: %d, stdout_wait_ms: %d, total_time_ms %d, bytes_out: %lld }\n",
+    fprintf(stderr, "{ \"stdin_wait_ms\": %d, \"stdout_wait_ms\": %d, \"total_time_ms\": %d, \"bytes_out\": %lld }\n",
         (int)(1000*stdin_pipe.time_waiting), (int)(1000*stdout_pipe.time_waiting), (int)(1000*total_time), bytes_out );
 }
 
@@ -64,9 +64,9 @@ static void stdin_callback (ev_io *watcher, int revents)
         {
             print_timer();
             if ( 0 == data_size )
-                fprintf(stderr, "{ exit_status: \"Success\", msg: \"End of file reached\" }\n");
+                fprintf(stderr, "{ \"exit_status\": \"Success\", \"msg\": \"End of file reached\" }\n");
             else
-                fprintf(stderr, "{ exit_status: \"Error\",  msg: \"Error reading from stdin\", errno: %d }\n", errno);
+                fprintf(stderr, "{ \"exit_status\": \"Error\",  \"msg\": \"Error reading from stdin\", \"errno\": %d }\n", errno);
 
             exit(data_size);
         }
@@ -88,7 +88,7 @@ static void stdout_callback (ev_io *watcher, int revents)
         if ( data_size != write( STDOUT_FILENO, &data[ 0 ], data_size ) )
         {
             print_timer();
-            fprintf(stderr, "{ exit_status: \"Error\",  msg: \"Error writing to stdout\" }\n");
+            fprintf(stderr, "{ \"exit_status\": \"Error\",  \"msg\": \"Error writing to stdout\" }\n");
             exit(data_size);
         }
 
@@ -111,9 +111,9 @@ static void timer_callback(struct ev_loop *loop, ev_timer *w, int revents)
     if ( bytes > 0 && bytes >= bytes_out )
     {
         if( mode == READING )
-            fprintf(stderr, "{ msg: \"Stalled reading from stdin\" }\n", data_size, errno);
+            fprintf(stderr, "{ \"msg\": \"Stalled reading from stdin\" }\n", data_size, errno);
         else
-            fprintf(stderr, "{ msg: \"Stalled writing to stdout\" }\n", data_size, errno);
+            fprintf(stderr, "{ \"msg\": \"Stalled writing to stdout\" }\n", data_size, errno);
     }
 
     bytes = bytes_out;
@@ -123,7 +123,7 @@ static void timer_callback(struct ev_loop *loop, ev_timer *w, int revents)
 static void sigint_callback (ev_async *w, int revents)
 {
     print_timer();
-    fprintf(stderr, "{ exit_status: \"Success\", msg: \"Received SIGINT\" }\n", data_size, errno);
+    fprintf(stderr, "{ \"exit_status\": \"Success\", \"msg\": \"Received SIGINT\" }\n", data_size, errno);
     exit(0);
 }
 

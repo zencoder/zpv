@@ -11,7 +11,7 @@ Output is human readable as well as valid json (One json object per line).
 
 example output:
 ---------------
-{ stdin_wait_ms: 26307, stdout_wait_ms: 1691, total_time_ms 27999, bytes_out: 410473472 }
+{ "stdin_wait_ms": 26307, "stdout_wait_ms": 1691, "total_time_ms": 27999, "bytes_out": 410473472 }
 
 definitions:
 
