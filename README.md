@@ -21,10 +21,10 @@ Output is human readable as well as valid json (One json object per line).
 
 ### Inferences
 
-1. **throughput**: bytes_out / total_time_ms
-2. **overhead created by the `zpv` tool itself**: total_time_ms - ( stdin_wait_ms + stdout_wait_ms )
-3. **stalled input**: `stdin_wait_ms` continues to increment while bytes_out remains static
-4. **stalled output**: stdout_wait_ms continues to increment while bytes_out remains static
+1. **throughput**: `bytes_out / total_time_ms`
+2. **overhead created by the `zpv` tool itself**: `total_time_ms - ( stdin_wait_ms + stdout_wait_ms )`
+3. **stalled input**: `stdin_wait_ms` continues to increment while `bytes_out` remains static
+4. **stalled output**: `stdout_wait_ms` continues to increment while `bytes_out` remains static
 
 
 ## Example Usage
