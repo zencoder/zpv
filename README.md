@@ -1,10 +1,10 @@
 # zpv: ZenPipeViewer
 
-Yet another tool to monitor the progress of data through a pipe. `zpv` simply copies standard in to standard out and prints progress information to standard error.
+Yet another tool to monitor the progress of data through a pipe.
 
-`zpv`, like [pv](http://www.ivarch.com/programs/pv.shtml), allows a user to see the progress of data through a pipeline. Unlike `pv`, `zpv` reports the amount of time spent waiting to read and write to stdin/stdout. This functionality gives more insight into the processes that generate and consume data to help performance profiling and monitoring in long plipelines.
+`zpv` simply copies standard in to standard out and prints progress information to standard error. Like [pv](http://www.ivarch.com/programs/pv.shtml), `zpv` allows a user to see the progress of data through a pipeline. Unlike `pv`, `zpv` reports the amount of time spent waiting to read and write to stdin/stdout. This functionality gives more insight into the processes that generate and consume data to help performance profiling and monitoring in long plipelines.
 
-Output is human readable as well as valid json with one json object per line.
+Output to standard error is human readable as well as valid json with one json object per line.
 
 ## Example Output
 
