@@ -56,6 +56,7 @@ static void print_timer()
         (int)(1000*stdin_pipe.time_waiting), (int)(1000*stdout_pipe.time_waiting), (int)(1000*total_time), bytes_out );
 }
 
+static void stdout_callback (ev_io *watcher, int revents);
 static void stdin_callback (ev_io *watcher, int revents)
 {
     if ( 0 == data_size )
@@ -78,6 +79,8 @@ static void stdin_callback (ev_io *watcher, int revents)
     stdout_pipe.timer_start = now;
     stdin_pipe.time_waiting += now - stdin_pipe.timer_start;
     ev_io_stop( loop, (ev_io*)&stdin_pipe ); // stop stdin
+
+    ev_io_init ((ev_io*)&stdout_pipe, stdout_callback, STDOUT_FILENO, EV_WRITE);
     ev_io_start( loop, (ev_io*)&stdout_pipe ); // start stdout
 }
 
@@ -102,6 +105,8 @@ static void stdout_callback (ev_io *watcher, int revents)
     stdin_pipe.timer_start = now;
     stdout_pipe.time_waiting += now - stdout_pipe.timer_start;
     ev_io_stop( loop, (ev_io*)&stdout_pipe );
+
+    ev_io_init ((ev_io*)&stdin_pipe , stdin_callback , STDIN_FILENO , EV_READ);
     ev_io_start( loop, (ev_io*)&stdin_pipe );
 }
 
@@ -141,12 +146,12 @@ int main(int argc, char **argv)
     stdin_pipe.timer_start = start_time;
 
     ev_io_init ((ev_io*)&stdin_pipe , stdin_callback , STDIN_FILENO , EV_READ);
-    ev_io_init ((ev_io*)&stdout_pipe, stdout_callback, STDOUT_FILENO, EV_WRITE);
-    ev_timer_init (&timer, timer_callback, 2.0, 2.0);
-    ev_signal_init (&exitsig, sigint_callback, SIGINT);
-
     ev_io_start( loop, (ev_io*)&stdin_pipe );
+
+    ev_timer_init (&timer, timer_callback, 2.0, 2.0);
     ev_timer_start (loop, &timer);
+
+    ev_signal_init (&exitsig, sigint_callback, SIGINT);
     ev_signal_start (loop, &exitsig);
 
     ev_run (loop, 0);
