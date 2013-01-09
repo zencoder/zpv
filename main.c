@@ -52,7 +52,7 @@ int64_t bytes_out;
 
 static void print_timer()
 {
-    register ev_tstamp now = ev_now( loop );
+    ev_tstamp now = ev_now( loop );
     ev_tstamp total_time = now - start_time;
     if ( 0 > total_time ) return;
     fprintf(stderr, "{ \"stdin_wait_ms\": %d, \"stdout_wait_ms\": %d, \"total_time_ms\": %d, \"bytes_out\": %lld }\n",
@@ -81,7 +81,7 @@ static void stdin_callback (EV_P_ ev_io *w, int revents)
     if( 0 < data_size )
     {
         // switch to write mode
-        register ev_tstamp now = ev_now( loop );
+        ev_tstamp now = ev_now( loop );
 
         mode = WRITING;
         stdout_pipe.timer_start = now;
@@ -114,7 +114,7 @@ static void stdout_callback (EV_P_ ev_io *w, int revents)
     {
         // Switch to read mode
 
-        register ev_tstamp now = ev_now( loop );
+        ev_tstamp now = ev_now( loop );
         mode = READING;
 
         stdin_pipe.timer_start = now;

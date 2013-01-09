@@ -1,5 +1,5 @@
 all:
-	gcc -O3 main.c -o zpv
+	gcc -O2 main.c -o zpv
 
 clean:
 	rm zpv
