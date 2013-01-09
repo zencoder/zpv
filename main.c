@@ -39,23 +39,25 @@ int mode;
 typedef struct
 {
     ev_io watcher;
-    double timer_start;
-    double time_waiting;
+    ev_tstamp timer_start;
+    ev_tstamp time_waiting;
 } pipe_t;
 
 pipe_t stdin_pipe;
 pipe_t stdout_pipe;
 ev_tstamp start_time;
+ev_timer timer;
+ev_signal exitsig;
 int64_t bytes_out;
 
 static void print_timer()
 {
-    ev_tstamp now = ev_now( loop );
+    register ev_tstamp now = ev_now( loop );
     ev_tstamp total_time = now - start_time;
-    if ( 0 == total_time ) return;
+    if ( 0 >= total_time ) return;
     fprintf(stderr, "{ \"stdin_wait_ms\": %d, \"stdout_wait_ms\": %d, \"total_time_ms\": %d, \"bytes_out\": %lld }\n",
-        (int)(1000 * ( stdin_pipe.time_waiting  + ( mode != READING ? 0 : now - stdin_pipe.timer_start ) ) ),
-        (int)(1000 * ( stdout_pipe.time_waiting + ( mode != WRITING ? 0 : now - stdout_pipe.timer_start) ) ),
+        (int)(1000 * ( stdin_pipe.time_waiting  + ( mode != READING || 0 > stdin_pipe.timer_start  ? 0 : now - stdin_pipe.timer_start ) ) ),
+        (int)(1000 * ( stdout_pipe.time_waiting + ( mode != WRITING || 0 > stdout_pipe.timer_start ? 0 : now - stdout_pipe.timer_start) ) ),
         (int)(1000 * total_time), bytes_out );
 }
 
@@ -79,10 +81,13 @@ static void stdin_callback (EV_P_ ev_io *w, int revents)
     if( 0 < data_size )
     {
         // switch to write mode
-        register double now = ev_now( loop );
+        register ev_tstamp now = ev_now( loop );
+
         mode = WRITING;
         stdout_pipe.timer_start = now;
-        stdin_pipe.time_waiting += now - stdin_pipe.timer_start;
+
+        if( 0 < stdin_pipe.timer_start )
+            stdin_pipe.time_waiting += now - stdin_pipe.timer_start;
 
         ev_io_init (&stdout_pipe.watcher, stdout_callback, STDOUT_FILENO, EV_WRITE);
         ev_io_start( loop, &stdout_pipe.watcher ); // start stdout
@@ -108,10 +113,14 @@ static void stdout_callback (EV_P_ ev_io *w, int revents)
     if ( 0 == data_size )
     {
         // Switch to read mode
-        register double now = ev_now( loop );
+
+        register ev_tstamp now = ev_now( loop );
         mode = READING;
+
         stdin_pipe.timer_start = now;
-        stdout_pipe.time_waiting += now - stdout_pipe.timer_start;
+
+        if ( 0 < stdout_pipe.timer_start )
+            stdout_pipe.time_waiting += now - stdout_pipe.timer_start;
 
         ev_io_init (&stdin_pipe.watcher, stdin_callback, STDIN_FILENO, EV_READ);
         ev_io_start( loop, &stdin_pipe.watcher );
@@ -121,7 +130,10 @@ static void stdout_callback (EV_P_ ev_io *w, int revents)
 
 static void timer_callback(struct ev_loop *loop, ev_timer *w, int revents)
 {
-    static bytes = 0;
+    static int bytes = 0;
+    if ( 0 > start_time )
+        start_time = ev_now( loop );
+
     if ( bytes > 0 && bytes >= bytes_out )
     {
         if( mode == READING )
@@ -148,12 +160,11 @@ int main(int argc, char **argv)
     data_size = 0;
     bytes_out = 0;
     loop = ev_loop_new( EVBACKEND_SELECT );
-    start_time = ev_time();
-    ev_timer timer;
-    ev_signal exitsig;
+    start_time = -1;
     stdout_pipe.time_waiting = 0;
+    stdout_pipe.timer_start = -1;
     stdin_pipe.time_waiting = 0;
-    stdin_pipe.timer_start = start_time;
+    stdin_pipe.timer_start = -1;
 
     ev_io_init (&stdout_pipe.watcher, stdout_callback, STDOUT_FILENO, EV_WRITE);
     ev_io_init (&stdin_pipe.watcher, stdin_callback, STDIN_FILENO, EV_READ);
