@@ -166,6 +166,7 @@ int main(int argc, char **argv)
     stdin_pipe.time_waiting = 0;
     stdin_pipe.timer_start = -1;
 
+/*
     flags = fcntl(STDIN_FILENO, F_GETFL, 0);
     if ( fcntl(STDIN_FILENO, F_SETFL, O_NONBLOCK | flags ) == -1 )
         fprintf(stderr, "{ \"msg\": \"Could not set O_NONBLOCK on stdin\" }\n", data_size, errno);
@@ -173,7 +174,7 @@ int main(int argc, char **argv)
     flags = fcntl(STDOUT_FILENO, F_GETFL, 0);
     if ( fcntl(STDOUT_FILENO, F_SETFL, O_NONBLOCK | flags ) == -1 )
         fprintf(stderr, "{ \"msg\": \"Could not set O_NONBLOCK on stdout\" }\n", data_size, errno);
-
+*/
 
     ev_io_init (&stdout_pipe.watcher, stdout_callback, STDOUT_FILENO, EV_WRITE);
     ev_io_init (&stdin_pipe.watcher, stdin_callback, STDIN_FILENO, EV_READ);
