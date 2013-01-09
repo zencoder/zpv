@@ -54,7 +54,7 @@ static void print_timer()
 {
     register ev_tstamp now = ev_now( loop );
     ev_tstamp total_time = now - start_time;
-    if ( 0 >= total_time ) return;
+    if ( 0 > total_time ) return;
     fprintf(stderr, "{ \"stdin_wait_ms\": %d, \"stdout_wait_ms\": %d, \"total_time_ms\": %d, \"bytes_out\": %lld }\n",
         (int)(1000 * ( stdin_pipe.time_waiting  + ( mode != READING || 0 > stdin_pipe.timer_start  ? 0 : now - stdin_pipe.timer_start ) ) ),
         (int)(1000 * ( stdout_pipe.time_waiting + ( mode != WRITING || 0 > stdout_pipe.timer_start ? 0 : now - stdout_pipe.timer_start) ) ),
@@ -170,7 +170,7 @@ int main(int argc, char **argv)
     ev_io_init (&stdin_pipe.watcher, stdin_callback, STDIN_FILENO, EV_READ);
     ev_io_start( loop, &stdin_pipe.watcher );
 
-    ev_timer_init (&timer, timer_callback, 2.0, 2.0);
+    ev_timer_init (&timer, timer_callback, 0.0, 2.0);
     ev_timer_start (loop, &timer);
 
     ev_signal_init (&exitsig, sigint_callback, SIGINT);
