@@ -27,7 +27,7 @@ limitations under the License.
 #define EV_STANDALONE  1
 #include "ev.c"
 ////////////////////////////////////////////////////////////////////////////////
-#define BUFFER_SIZE (4*1024*1024) // disk / fs blocks are uasually 4k
+#define BUFFER_SIZE PIPE_BUF
 struct ev_loop *loop;
 char data[BUFFER_SIZE+1];
 int data_size;
@@ -54,7 +54,7 @@ static void print_timer()
 {
     ev_tstamp now = ev_now( loop );
     ev_tstamp total_time = now - start_time;
-    if ( 0 > total_time ) return;
+    if ( 0 >= total_time ) return;
     fprintf(stderr, "{ \"stdin_wait_ms\": %d, \"stdout_wait_ms\": %d, \"total_time_ms\": %d, \"bytes_out\": %lld }\n",
         (int)(1000 * ( stdin_pipe.time_waiting  + ( mode != READING || 0 > stdin_pipe.timer_start  ? 0 : now - stdin_pipe.timer_start ) ) ),
         (int)(1000 * ( stdout_pipe.time_waiting + ( mode != WRITING || 0 > stdout_pipe.timer_start ? 0 : now - stdout_pipe.timer_start) ) ),
@@ -165,6 +165,15 @@ int main(int argc, char **argv)
     stdout_pipe.timer_start = -1;
     stdin_pipe.time_waiting = 0;
     stdin_pipe.timer_start = -1;
+
+    flags = fcntl(STDIN_FILENO, F_GETFL, 0);
+    if ( fcntl(STDIN_FILENO, F_SETFL, O_NONBLOCK | flags ) == -1 )
+        fprintf(stderr, "{ \"msg\": \"Could not set O_NONBLOCK on stdin\" }\n", data_size, errno);
+
+    flags = fcntl(STDOUT_FILENO, F_GETFL, 0);
+    if ( fcntl(STDOUT_FILENO, F_SETFL, O_NONBLOCK | flags ) == -1 )
+        fprintf(stderr, "{ \"msg\": \"Could not set O_NONBLOCK on stdout\" }\n", data_size, errno);
+
 
     ev_io_init (&stdout_pipe.watcher, stdout_callback, STDOUT_FILENO, EV_WRITE);
     ev_io_init (&stdin_pipe.watcher, stdin_callback, STDIN_FILENO, EV_READ);
