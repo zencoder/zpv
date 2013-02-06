@@ -52,7 +52,7 @@ int64_t bytes_out;
 
 static void print_timer()
 {
-    ev_tstamp now = ev_now( loop );
+    ev_tstamp now = ev_time();
     ev_tstamp total_time = now - start_time;
     if ( 0 >= total_time ) return;
     fprintf(stderr, "{ \"posix_time\": %f, \"stdin_wait_ms\": %d, \"stdout_wait_ms\": %d, \"total_time_ms\": %d, \"bytes_out\": %lld }\n", now,
@@ -131,9 +131,6 @@ static void stdout_callback (EV_P_ ev_io *w, int revents)
 static void timer_callback(struct ev_loop *loop, ev_timer *w, int revents)
 {
     static int bytes = 0;
-    if ( 0 > start_time )
-        start_time = ev_now( loop );
-
     if ( bytes > 0 && bytes >= bytes_out )
     {
         if( mode == READING )
@@ -160,7 +157,7 @@ int main(int argc, char **argv)
     data_size = 0;
     bytes_out = 0;
     loop = ev_loop_new( EVBACKEND_SELECT );
-    start_time = -1;
+    start_time = ev_time();
     stdout_pipe.time_waiting = 0;
     stdout_pipe.timer_start = -1;
     stdin_pipe.time_waiting = 0;
@@ -180,11 +177,12 @@ int main(int argc, char **argv)
     ev_io_init (&stdin_pipe.watcher, stdin_callback, STDIN_FILENO, EV_READ);
     ev_io_start( loop, &stdin_pipe.watcher );
 
-    ev_timer_init (&timer, timer_callback, 0.0, 2.0);
+    ev_timer_init (&timer, timer_callback, 2.0, 2.0);
     ev_timer_start (loop, &timer);
 
     ev_signal_init (&exitsig, sigint_callback, SIGINT);
     ev_signal_start (loop, &exitsig);
 
+    print_timer();
     ev_run (loop, 0);
 }
