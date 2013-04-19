@@ -16,6 +16,9 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
+
+#define VERSION 0.2
+
 ////////////////////////////////////////////////////////////////////////////////
 // #define EV_USE_EVENTFD 1
 // #define EV_USE_SELECT  1
