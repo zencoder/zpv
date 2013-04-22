@@ -66,13 +66,17 @@ static void update_times()
     posix_time = ev_time();
     time_t truncated_time = posix_time;
     strftime(formatted_time, 32, "%Y-%m-%d %H:%M:%S", gmtime(&truncated_time));
+
+    // Add microseconds
+    truncated_time = (posix_time - truncated_time) * 100000;
+    sprintf(formatted_time+19, ".%06d", (int)truncated_time);
 }
 
 static void print_timer()
 {
     ev_tstamp total_time = posix_time - start_time;
     if ( 0 >= total_time ) return;
-    fprintf(stderr, "{ \"utc_time\": \"%s\", \"posix_time\": %f, \"stdin_wait_ms\": %d, \"stdout_wait_ms\": %d, \"total_time_ms\": %d, \"bytes_out\": %lld }\n", formatted_time, posix_time,
+    fprintf(stderr, "{ \"utc_time\": \"%s\", \"stdin_wait_ms\": %d, \"stdout_wait_ms\": %d, \"total_time_ms\": %d, \"bytes_out\": %lld }\n", formatted_time,
         (int)(1000 * ( stdin_pipe.time_waiting  + ( mode != READING || 0 > stdin_pipe.timer_start  ? 0 : posix_time - stdin_pipe.timer_start ) ) ),
         (int)(1000 * ( stdout_pipe.time_waiting + ( mode != WRITING || 0 > stdout_pipe.timer_start ? 0 : posix_time - stdout_pipe.timer_start) ) ),
         (int)(1000 * total_time), bytes_out );
@@ -88,9 +92,9 @@ static void stdin_callback (EV_P_ ev_io *w, int revents)
             update_times();
             print_timer();
             if ( 0 == data_size )
-                fprintf(stderr, "{ \"utc_time\": \"%s\", \"posix_time\": %f, \"exit_status\": \"Success\", \"msg\": \"End of file reached\" }\n", formatted_time, posix_time);
+                fprintf(stderr, "{ \"utc_time\": \"%s\", \"exit_status\": \"Success\", \"msg\": \"End of file reached\" }\n", formatted_time);
             else
-                fprintf(stderr, "{ \"utc_time\": \"%s\", \"posix_time\": %f, \"exit_status\": \"Error\",  \"msg\": \"Error reading from stdin\", \"errno\": %d }\n", formatted_time, posix_time, errno);
+                fprintf(stderr, "{ \"utc_time\": \"%s\", \"exit_status\": \"Error\",  \"msg\": \"Error reading from stdin\", \"errno\": %d }\n", formatted_time, errno);
 
             exit(data_size);
         }
@@ -121,7 +125,7 @@ static void stdout_callback (EV_P_ ev_io *w, int revents)
         {
             update_times();
             print_timer();
-            fprintf(stderr, "{ \"utc_time\": \"%s\", \"posix_time\": %f, \"exit_status\": \"Error\",  \"msg\": \"Error writing to stdout\" }\n", formatted_time, posix_time);
+            fprintf(stderr, "{ \"utc_time\": \"%s\", \"exit_status\": \"Error\",  \"msg\": \"Error writing to stdout\" }\n", formatted_time);
             exit(data_size);
         }
 
@@ -154,9 +158,9 @@ static void timer_callback(struct ev_loop *loop, ev_timer *w, int revents)
     {
         update_times();
         if( mode == READING )
-            fprintf(stderr, "{ \"utc_time\": \"%s\", \"posix_time\": %f, \"msg\": \"Stalled reading from stdin\" }\n", formatted_time, posix_time);
+            fprintf(stderr, "{ \"utc_time\": \"%s\", \"msg\": \"Stalled reading from stdin\" }\n", formatted_time);
         else
-            fprintf(stderr, "{ \"utc_time\": \"%s\", \"posix_time\": %f, \"msg\": \"Stalled writing to stdout\" }\n", formatted_time, posix_time);
+            fprintf(stderr, "{ \"utc_time\": \"%s\", \"msg\": \"Stalled writing to stdout\" }\n", formatted_time);
     }
 
     bytes = bytes_out;
@@ -167,7 +171,7 @@ static void sigint_callback (struct ev_loop *loop, ev_signal *w, int revents)
 {
     update_times();
     print_timer();
-    fprintf(stderr, "{ \"utc_time\": \"%s\", \"posix_time\": %f, \"exit_status\": \"Success\", \"msg\": \"Received SIGINT\" }\n", formatted_time, posix_time );
+    fprintf(stderr, "{ \"utc_time\": \"%s\", \"exit_status\": \"Success\", \"msg\": \"Received SIGINT\" }\n", formatted_time );
     exit(0);
 }
 
