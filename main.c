@@ -154,9 +154,9 @@ static void stdout_callback (EV_P_ ev_io *w, int revents)
 static void timer_callback(struct ev_loop *loop, ev_timer *w, int revents)
 {
     static int bytes = 0;
+    update_times();
     if ( bytes > 0 && bytes >= bytes_out )
     {
-        update_times();
         if( mode == READING )
             fprintf(stderr, "{ \"utc_time\": \"%s\", \"msg\": \"Stalled reading from stdin\" }\n", formatted_time);
         else
