@@ -4,10 +4,8 @@ all:
 clean:
 	rm zpv
 
-install: zegmenter
+install: zpv
 	cp zpv /usr/local/bin/
 
 uninstall:
 	rm /usr/local/bin/zpv
-
-

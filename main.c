@@ -2,7 +2,7 @@
 Copyright 2012 Brightcove, Inc.
 
     Author:
-    mszatmary@brightcove.com
+    jgreer@brightcove.com
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,175 +17,130 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-#define VERSION 0.2
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/select.h>
+#include <time.h>
+#include <errno.h>
 
-////////////////////////////////////////////////////////////////////////////////
-// #define EV_USE_EVENTFD 1
-// #define EV_USE_SELECT  1
-// #define EV_USE_POLL    1
-// #define EV_USE_EPOLL   1 // Linux Only
-// #define EV_USE_KQUEUE  1 // BSD/OSX Only
-#define EV_NO_THREADS 1
+#include "mac_support.h"
 
-#define EV_STANDALONE  1
-#include "ev.c"
-////////////////////////////////////////////////////////////////////////////////
-#define BUFFER_SIZE PIPE_BUF
-struct ev_loop *loop;
-char data[BUFFER_SIZE+1];
-int data_size;
+#define VERSION "0.5"
+#define BUFFER_SIZE 0x10000 // 64k
 
-#define READING 0
-#define WRITING 1
-int mode;
+// Not all systems have a coarse/fast clock, so allow fallback.
+#if defined CLOCK_MONOTONIC_COARSE
+#define XCLOCK_MONOTONIC CLOCK_MONOTONIC_COARSE
+#else
+#define XCLOCK_MONOTONIC CLOCK_MONOTONIC
+#endif
 
-typedef struct
-{
-    ev_io watcher;
-    ev_tstamp timer_start;
-    ev_tstamp time_waiting;
-} pipe_t;
+char *current_state;
+double initial_start_time;
+double read_wait_time = 0.0;
+double write_wait_time = 0.0;
 
-pipe_t stdin_pipe;
-pipe_t stdout_pipe;
-ev_tstamp start_time;
-ev_timer timer;
-ev_signal exitsig;
-int64_t bytes_out;
-
-static void print_timer()
-{
-    ev_tstamp now = ev_time();
-    ev_tstamp total_time = now - start_time;
-    if ( 0 >= total_time ) return;
-    fprintf(stderr, "{ \"posix_time\": %f, \"stdin_wait_ms\": %d, \"stdout_wait_ms\": %d, \"total_time_ms\": %d, \"bytes_out\": %lld }\n", now,
-        (int)(1000 * ( stdin_pipe.time_waiting  + ( mode != READING || 0 > stdin_pipe.timer_start  ? 0 : now - stdin_pipe.timer_start ) ) ),
-        (int)(1000 * ( stdout_pipe.time_waiting + ( mode != WRITING || 0 > stdout_pipe.timer_start ? 0 : now - stdout_pipe.timer_start) ) ),
-        (int)(1000 * total_time), bytes_out );
+double get_current_time() {
+  struct timespec now;
+  clock_gettime(XCLOCK_MONOTONIC, &now);
+  double decimal_time = (double)(now.tv_sec);
+  decimal_time += (double)(now.tv_nsec) / 1e9;
+  return decimal_time;
 }
 
-static void stdout_callback (EV_P_ ev_io *w, int revents);
-static void stdin_callback (EV_P_ ev_io *w, int revents)
-{
-    if ( 0 == data_size )
-    {
-        if ( 0 >= ( data_size = read( STDIN_FILENO, &data[ 0 ], BUFFER_SIZE ) ) )
-        {
-            print_timer();
-            if ( 0 == data_size )
-                fprintf(stderr, "{ \"posix_time\": %f, \"exit_status\": \"Success\", \"msg\": \"End of file reached\" }\n", ev_time());
-            else
-                fprintf(stderr, "{ \"posix_time\": %f, \"exit_status\": \"Error\",  \"msg\": \"Error reading from stdin\", \"errno\": %d }\n", ev_time(), errno);
-
-            exit(data_size);
-        }
-    }
-
-    if( 0 < data_size )
-    {
-        // switch to write mode
-        ev_tstamp now = ev_now( loop );
-
-        mode = WRITING;
-        stdout_pipe.timer_start = now;
-
-        if( 0 < stdin_pipe.timer_start )
-            stdin_pipe.time_waiting += now - stdin_pipe.timer_start;
-
-        ev_io_init (&stdout_pipe.watcher, stdout_callback, STDOUT_FILENO, EV_WRITE);
-        ev_io_start( loop, &stdout_pipe.watcher ); // start stdout
-        ev_io_stop( loop, &stdin_pipe.watcher ); // stop stdin
-    }
+// NOTE: Buffer must be at least 32 chars!
+void format_time(const double the_time, char* buffer) {
+  time_t truncated_time = (time_t)the_time;
+  // First the general formatting
+  strftime(buffer, 32, "%Y-%m-%d %H:%M:%S", gmtime(&truncated_time));
+  // Then add microseconds
+  truncated_time = (the_time - truncated_time) * 100000;
+  sprintf(buffer+19, ".%06d", (int)truncated_time);
 }
 
-static void stdout_callback (EV_P_ ev_io *w, int revents)
-{
-    if ( 0 < data_size )
-    {
-        if ( data_size != write( STDOUT_FILENO, &data[ 0 ], data_size ) )
-        {
-            print_timer();
-            fprintf(stderr, "{ \"posix_time\": %f, \"exit_status\": \"Error\",  \"msg\": \"Error writing to stdout\" }\n", ev_time());
-            exit(data_size);
-        }
-
-        bytes_out += data_size;
-        data_size = 0;
-    }
-
-    if ( 0 == data_size )
-    {
-        // Switch to read mode
-
-        ev_tstamp now = ev_now( loop );
-        mode = READING;
-
-        stdin_pipe.timer_start = now;
-
-        if ( 0 < stdout_pipe.timer_start )
-            stdout_pipe.time_waiting += now - stdout_pipe.timer_start;
-
-        ev_io_init (&stdin_pipe.watcher, stdin_callback, STDIN_FILENO, EV_READ);
-        ev_io_start( loop, &stdin_pipe.watcher );
-        ev_io_stop( loop, &stdout_pipe.watcher );
-    }
+static void print_version() {
+  fprintf(stderr, "{ \"zpv_version\": \"%s\" }\n", VERSION);
 }
 
-static void timer_callback(struct ev_loop *loop, ev_timer *w, int revents)
-{
-    static int bytes = 0;
-    if ( bytes > 0 && bytes >= bytes_out )
-    {
-        if( mode == READING )
-            fprintf(stderr, "{ \"posix_time\": %f, \"msg\": \"Stalled reading from stdin\" }\n", ev_time());
-        else
-            fprintf(stderr, "{ \"posix_time\": %f, \"msg\": \"Stalled writing to stdout\" }\n", ev_time());
+void print_stats() {
+  char formatted_time[32];
+  double cur_time = get_current_time();
+  format_time(cur_time, formatted_time);
+  fprintf(stderr, "%s - %s - Read wait: %0.6f, Write wait: %0.6f, Elapsed: %0.6f\n", formatted_time, current_state, read_wait_time, write_wait_time, cur_time - initial_start_time);
+}
+
+void wait_for_reading() {
+  static fd_set fds;
+  struct timeval tv = { 1, 0 };
+  double before, elapsed;
+
+  FD_ZERO(&fds);
+  FD_SET(0, &fds);
+
+  before = get_current_time();
+  while (select(1, &fds, NULL, NULL, &tv) <= 0) print_stats();
+  elapsed = get_current_time() - before;
+  read_wait_time += elapsed;
+}
+
+void wait_for_writing() {
+  static fd_set fds;
+  struct timeval tv = { 1, 0 };
+  double before, elapsed;
+
+  FD_ZERO(&fds);
+  FD_SET(1, &fds);
+
+  before = get_current_time();
+  while (select(2, NULL, &fds, NULL, &tv) <= 0) print_stats();
+  elapsed = get_current_time() - before;
+  write_wait_time += elapsed;
+}
+
+int main(int argc,char* argv[]){
+
+  if (argc > 1 && strcmp(argv[1],"-h") == 0) {
+    fprintf(stderr, "Usage: prog1 | zpv2 [-u unique_string] 2> zpv2.log | prog2\n");
+    fprintf(stderr, "  The unique string is ignored.  Just for finding in 'ps' output.\n");
+    fprintf(stderr, "  Timing info is written to stderr.\n");
+    exit(1);
+  }
+
+  char buf[BUFFER_SIZE];
+  int bytes_read;
+  int result;
+  double before, after, elapsed;
+
+  initial_start_time = get_current_time();
+  current_state = "start   ";
+  print_stats();
+  current_state = "running ";
+
+  before = initial_start_time;
+  while (1) {
+
+    wait_for_reading();
+    bytes_read = read(0, buf, BUFFER_SIZE);
+    // fprintf(stderr, "Bytes read: %d\n", bytes_read);
+
+    if (bytes_read <= 0) break; // When we can't read anymore, quit.
+
+    wait_for_writing();
+    result = write(1, buf, bytes_read);
+    if (result < 1) break; // If the program we're writing to dies, then make sure we quit.
+
+    // Print stats every 1 seconds.
+    after = get_current_time();
+    elapsed = after - before;
+    if (elapsed > 1.0) {
+      print_stats();
+      before = after;
     }
+  }
 
-    bytes = bytes_out;
-    print_timer();
-}
+  current_state = "finished";
+  print_stats();
 
-static void sigint_callback (struct ev_loop *loop, ev_signal *w, int revents)
-{
-    print_timer();
-    fprintf(stderr, "{ \"posix_time\": %f, \"exit_status\": \"Success\", \"msg\": \"Received SIGINT\" }\n", ev_time() );
-    exit(0);
-}
-
-int main(int argc, char **argv)
-{
-    int flags;
-    mode = READING;
-    data_size = 0;
-    bytes_out = 0;
-    loop = ev_loop_new( EVBACKEND_SELECT );
-    start_time = ev_time();
-    stdout_pipe.time_waiting = 0;
-    stdout_pipe.timer_start = -1;
-    stdin_pipe.time_waiting = 0;
-    stdin_pipe.timer_start = -1;
-
-/*
-    flags = fcntl(STDIN_FILENO, F_GETFL, 0);
-    if ( fcntl(STDIN_FILENO, F_SETFL, O_NONBLOCK | flags ) == -1 )
-        fprintf(stderr, "{ \"msg\": \"Could not set O_NONBLOCK on stdin\" }\n", data_size, errno);
-
-    flags = fcntl(STDOUT_FILENO, F_GETFL, 0);
-    if ( fcntl(STDOUT_FILENO, F_SETFL, O_NONBLOCK | flags ) == -1 )
-        fprintf(stderr, "{ \"msg\": \"Could not set O_NONBLOCK on stdout\" }\n", data_size, errno);
-*/
-
-    ev_io_init (&stdout_pipe.watcher, stdout_callback, STDOUT_FILENO, EV_WRITE);
-    ev_io_init (&stdin_pipe.watcher, stdin_callback, STDIN_FILENO, EV_READ);
-    ev_io_start( loop, &stdin_pipe.watcher );
-
-    ev_timer_init (&timer, timer_callback, 2.0, 2.0);
-    ev_timer_start (loop, &timer);
-
-    ev_signal_init (&exitsig, sigint_callback, SIGINT);
-    ev_signal_start (loop, &exitsig);
-
-    print_timer();
-    ev_run (loop, 0);
+  // fprintf(stderr, "SUCCESS!\n");
+  return 0;
 }
