@@ -1,5 +1,5 @@
 /*
-Copyright 2012 Brightcove, Inc.
+Copyright 2013 Brightcove, Inc.
 
     Author:
     jgreer@brightcove.com
