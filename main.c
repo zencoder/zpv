@@ -105,7 +105,7 @@ void wait_for_reading() {
   before = get_current_time();
   while (select(1, &fds, NULL, NULL, &tv) <= 0) {
     print_message("Stalled reading from stdin");
-    tv.tv_sec = 0;
+    tv.tv_sec = 1;
     tv.tv_usec = 0;
   }
   elapsed = get_current_time() - before;
@@ -123,7 +123,7 @@ void wait_for_writing() {
   before = get_current_time();
   while (select(2, NULL, &fds, NULL, &tv) <= 0) {
     print_message("Stalled writing to stdout");
-    tv.tv_sec = 0;
+    tv.tv_sec = 1;
     tv.tv_usec = 0;
   }
   elapsed = get_current_time() - before;
