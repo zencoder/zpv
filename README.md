@@ -9,7 +9,7 @@ Output to standard error is human readable as well as valid json with one json o
 ## Example Output
 
 ```json
-{ "utc_time": "2013-05-21 18:48:24.000569", "stdin_wait_ms": 26307, "stdout_wait_ms": 1691, "total_time_ms": 27999, "bytes_out": 410473472 }
+{ "utc_time": "2013-05-21 18:48:24.006", "stdin_wait_ms": 26307, "stdout_wait_ms": 1691, "total_time_ms": 27999, "bytes_out": 410473472 }
 ```
 
 ### Definitions
