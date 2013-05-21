@@ -121,7 +121,7 @@ void wait_for_writing() {
   write_wait_time += elapsed;
 }
 
-static void sigint_callback() {
+static void sigint_callback(int signal_number) {
   quit_with_success("Received SIGINT");
 }
 
@@ -142,6 +142,9 @@ int main(int argc,char* argv[]){
   initial_start_time = get_current_time();
   print_version();
   print_stats();
+
+  // Start trapping interrupts!
+  signal(SIGINT, sigint_callback);
 
   before = initial_start_time;
   while (1) {
