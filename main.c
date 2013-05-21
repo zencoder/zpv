@@ -21,6 +21,7 @@ limitations under the License.
 #include <stdlib.h>
 #include <sys/select.h>
 #include <time.h>
+#include <signal.h>
 #include <errno.h>
 
 #include "mac_support.h"

@@ -1,5 +1,12 @@
+LIBS=
+UNAME := $(shell uname)
+
+ifeq ($(UNAME), Linux)
+	LIBS += -lrt
+endif
+
 all:
-	gcc -O2 main.c -o zpv
+	gcc -O2 main.c $(LIBS) -o zpv
 
 clean:
 	rm zpv
