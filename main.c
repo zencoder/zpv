@@ -35,10 +35,10 @@ limitations under the License.
 #define XCLOCK_MONOTONIC CLOCK_MONOTONIC
 #endif
 
-char *current_state;
 double initial_start_time;
 double read_wait_time = 0.0;
 double write_wait_time = 0.0;
+long long unsigned int total_bytes_written = 0;
 
 double get_current_time() {
   struct timespec now;
@@ -54,23 +54,47 @@ void format_time(const double the_time, char* buffer) {
   // First the general formatting
   strftime(buffer, 32, "%Y-%m-%d %H:%M:%S", gmtime(&truncated_time));
   // Then add microseconds
-  truncated_time = (the_time - truncated_time) * 100000;
-  sprintf(buffer+19, ".%06d", (int)truncated_time);
+  truncated_time = (the_time - truncated_time) * 1000;
+  sprintf(buffer+19, ".%03d", (int)truncated_time);
 }
 
-static void print_version() {
+void print_version() {
   fprintf(stderr, "{ \"zpv_version\": \"%s\" }\n", VERSION);
+}
+
+void print_message(char* message) {
+  char formatted_time[32];
+  format_time(get_current_time(), formatted_time);
+  fprintf(stderr, "{ \"utc_time\": \"%s\", \"msg\": \"%s\" }\n", formatted_time, message);
+}
+
+void quit_with_error(char* message) {
+  char formatted_time[32];
+  format_time(get_current_time(), formatted_time);
+  fprintf(stderr, "{ \"utc_time\": \"%s\", \"exit_status\": \"Error\", \"msg\": \"%s\" }\n", formatted_time, message);
+  exit(1);
+}
+
+void quit_with_success(char* message) {
+  char formatted_time[32];
+  format_time(get_current_time(), formatted_time);
+  fprintf(stderr, "{ \"utc_time\": \"%s\", \"exit_status\": \"Success\", \"msg\": \"%s\" }\n", formatted_time, message);
+  exit(0);
 }
 
 void print_stats() {
   char formatted_time[32];
   double cur_time = get_current_time();
   format_time(cur_time, formatted_time);
-  fprintf(stderr, "%s - %s - Read wait: %0.6f, Write wait: %0.6f, Elapsed: %0.6f\n", formatted_time, current_state, read_wait_time, write_wait_time, cur_time - initial_start_time);
+  long long unsigned int in_wait, out_wait, total_time;
+  in_wait =    (long long unsigned int)(read_wait_time * 1000);
+  out_wait =   (long long unsigned int)(write_wait_time * 1000);
+  total_time = (long long unsigned int)((cur_time - initial_start_time) * 1000);
+  fprintf(stderr, "{ \"utc_time\": \"%s\", \"stdin_wait_ms\": %llu, \"stdout_wait_ms\": %llu, \"total_time_ms\": %llu, \"bytes_out\": %llu }\n", formatted_time, in_wait, out_wait, total_time, total_bytes_written);
 }
 
 void wait_for_reading() {
-  static fd_set fds;
+  fd_set fds;
   struct timeval tv = { 1, 0 };
   double before, elapsed;
 
@@ -78,13 +102,13 @@ void wait_for_reading() {
   FD_SET(0, &fds);
 
   before = get_current_time();
-  while (select(1, &fds, NULL, NULL, &tv) <= 0) print_stats();
+  while (select(1, &fds, NULL, NULL, &tv) <= 0) print_message("Stalled reading from stdin");
   elapsed = get_current_time() - before;
   read_wait_time += elapsed;
 }
 
 void wait_for_writing() {
-  static fd_set fds;
+  fd_set fds;
   struct timeval tv = { 1, 0 };
   double before, elapsed;
 
@@ -92,9 +116,13 @@ void wait_for_writing() {
   FD_SET(1, &fds);
 
   before = get_current_time();
-  while (select(2, NULL, &fds, NULL, &tv) <= 0) print_stats();
+  while (select(2, NULL, &fds, NULL, &tv) <= 0) print_message("Stalled writing to stdout");
   elapsed = get_current_time() - before;
   write_wait_time += elapsed;
+}
+
+static void sigint_callback() {
+  quit_with_success("Received SIGINT");
 }
 
 int main(int argc,char* argv[]){
@@ -112,22 +140,19 @@ int main(int argc,char* argv[]){
   double before, after, elapsed;
 
   initial_start_time = get_current_time();
-  current_state = "start   ";
+  print_version();
   print_stats();
-  current_state = "running ";
 
   before = initial_start_time;
   while (1) {
-
     wait_for_reading();
     bytes_read = read(0, buf, BUFFER_SIZE);
-    // fprintf(stderr, "Bytes read: %d\n", bytes_read);
-
     if (bytes_read <= 0) break; // When we can't read anymore, quit.
 
     wait_for_writing();
     result = write(1, buf, bytes_read);
-    if (result < 1) break; // If the program we're writing to dies, then make sure we quit.
+    if (result != bytes_read) quit_with_error("Error writing to stdout");
+    total_bytes_written += result;
 
     // Print stats every 1 seconds.
     after = get_current_time();
@@ -138,9 +163,8 @@ int main(int argc,char* argv[]){
     }
   }
 
-  current_state = "finished";
   print_stats();
+  quit_with_success("End of file reached");
 
-  // fprintf(stderr, "SUCCESS!\n");
   return 0;
 }
