@@ -103,7 +103,11 @@ void wait_for_reading() {
   FD_SET(0, &fds);
 
   before = get_current_time();
-  while (select(1, &fds, NULL, NULL, &tv) <= 0) print_message("Stalled reading from stdin");
+  while (select(1, &fds, NULL, NULL, &tv) <= 0) {
+    print_message("Stalled reading from stdin");
+    tv.tv_sec = 0;
+    tv.tv_usec = 0;
+  }
   elapsed = get_current_time() - before;
   read_wait_time += elapsed;
 }
@@ -117,7 +121,11 @@ void wait_for_writing() {
   FD_SET(1, &fds);
 
   before = get_current_time();
-  while (select(2, NULL, &fds, NULL, &tv) <= 0) print_message("Stalled writing to stdout");
+  while (select(2, NULL, &fds, NULL, &tv) <= 0) {
+    print_message("Stalled writing to stdout");
+    tv.tv_sec = 0;
+    tv.tv_usec = 0;
+  }
   elapsed = get_current_time() - before;
   write_wait_time += elapsed;
 }
