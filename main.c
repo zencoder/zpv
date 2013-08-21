@@ -39,6 +39,7 @@ limitations under the License.
 double initial_start_time;
 double read_wait_time = 0.0;
 double write_wait_time = 0.0;
+long long unsigned int total_bytes_read = 0;
 long long unsigned int total_bytes_written = 0;
 double realtime_clock_offset = 0.0;
 
@@ -110,7 +111,7 @@ void print_stats() {
   in_wait =    (long long unsigned int)(read_wait_time * 1000);
   out_wait =   (long long unsigned int)(write_wait_time * 1000);
   total_time = (long long unsigned int)((cur_time - initial_start_time) * 1000);
-  fprintf(stderr, "{ \"utc_time\": \"%s\", \"stdin_wait_ms\": %llu, \"stdout_wait_ms\": %llu, \"total_time_ms\": %llu, \"bytes_out\": %llu }\n", formatted_time, in_wait, out_wait, total_time, total_bytes_written);
+  fprintf(stderr, "{ \"utc_time\": \"%s\", \"stdin_wait_ms\": %llu, \"stdout_wait_ms\": %llu, \"total_time_ms\": %llu, \"bytes_in\": %llu, \"bytes_out\": %llu }\n", formatted_time, in_wait, out_wait, total_time, total_bytes_read, total_bytes_written);
 }
 
 void wait_for_reading() {
@@ -122,10 +123,11 @@ void wait_for_reading() {
   FD_SET(0, &fds);
 
   before = get_current_time();
-  while (select(1, &fds, NULL, NULL, &tv) <= 0) {
+  while (select(1, &fds, NULL, NULL, &tv) == 0) {
     print_message("Stalled reading from stdin");
     tv.tv_sec = 1;
     tv.tv_usec = 0;
+    FD_SET(0, &fds);
   }
   elapsed = get_current_time() - before;
   read_wait_time += elapsed;
@@ -140,10 +142,11 @@ void wait_for_writing() {
   FD_SET(1, &fds);
 
   before = get_current_time();
-  while (select(2, NULL, &fds, NULL, &tv) <= 0) {
+  while (select(2, NULL, &fds, NULL, &tv) == 0) {
     print_message("Stalled writing to stdout");
     tv.tv_sec = 1;
     tv.tv_usec = 0;
+    FD_SET(1, &fds);
   }
   elapsed = get_current_time() - before;
   write_wait_time += elapsed;
@@ -180,6 +183,7 @@ int main(int argc,char* argv[]){
     wait_for_reading();
     bytes_read = read(0, buf, BUFFER_SIZE);
     if (bytes_read <= 0) break; // When we can't read anymore, quit.
+    total_bytes_read += bytes_read;
 
     // Print stats every 1 seconds.
     after = get_current_time();
