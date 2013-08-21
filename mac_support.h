@@ -13,6 +13,7 @@ int clock_gettime(int clk_id, struct timespec* t) {
 }
 
 // We also need to define the clock type.
+#define CLOCK_REALTIME 0
 #define CLOCK_MONOTONIC 1
 
 #endif

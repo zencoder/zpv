@@ -40,13 +40,32 @@ double initial_start_time;
 double read_wait_time = 0.0;
 double write_wait_time = 0.0;
 long long unsigned int total_bytes_written = 0;
+double realtime_clock_offset = 0.0;
+
+double timespec_to_double(struct timespec *the_time) {
+  double decimal_time = (double)(the_time->tv_sec);
+  decimal_time += (double)(the_time->tv_nsec) / 1e9;
+  return decimal_time;
+}
 
 double get_current_time() {
   struct timespec now;
   clock_gettime(XCLOCK_MONOTONIC, &now);
-  double decimal_time = (double)(now.tv_sec);
-  decimal_time += (double)(now.tv_nsec) / 1e9;
-  return decimal_time;
+  return timespec_to_double(&now) + realtime_clock_offset;
+}
+
+void set_realtime_clock_offset() {
+  struct timespec now;
+  clock_gettime(CLOCK_REALTIME, &now);
+  double realtime_decimal = timespec_to_double(&now);
+
+  // Technically there's a tiny delay between the clock calls, but it'll be close
+  // enough for anything we care about.
+  double now_decimal = get_current_time();
+
+  if (realtime_decimal > now_decimal) {
+    realtime_clock_offset = realtime_decimal - now_decimal;
+  }
 }
 
 // NOTE: Buffer must be at least 32 chars!
@@ -148,6 +167,7 @@ int main(int argc,char* argv[]){
   int result;
   double before, after, elapsed;
 
+  set_realtime_clock_offset();
   initial_start_time = get_current_time();
   print_version();
   print_stats();
