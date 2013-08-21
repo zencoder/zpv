@@ -181,6 +181,14 @@ int main(int argc,char* argv[]){
     bytes_read = read(0, buf, BUFFER_SIZE);
     if (bytes_read <= 0) break; // When we can't read anymore, quit.
 
+    // Print stats every 1 seconds.
+    after = get_current_time();
+    elapsed = after - before;
+    if (elapsed > 1.0) {
+      print_stats();
+      before = after;
+    }
+
     wait_for_writing();
     result = write(1, buf, bytes_read);
     if (result != bytes_read) quit_with_error("Error writing to stdout");
